@@ -1,0 +1,22 @@
+Sample_name	Replicate	Sample_type	Sample_order	Hormone
+Root	Root_3	In vivo	1	
+Root	Root_1	In vivo	1	
+Leaves	Leaves_3	In vivo	4	
+Leaves	Leaves_2	In vivo	4	
+Leaves	Leaves_1	In vivo	4	
+Bulb	Bulb_3	In vivo	2	
+Bulb	Bulb_2	In vivo	2	
+Light4	Light4_3	In vitro	1	4mg/L 2,4-D
+Bulb	Bulb_1	In vivo	2	
+Light4	Light4_2	In vitro	1	4mg/L 2,4-D
+Light4	Light4_1	In vitro	1	4mg/L 2,4-D
+Light3	Light3_3	In vitro	2	2mg/L 2,4-D
+Light3	Light3_2	In vitro	2	2mg/L 2,4-D
+Light3	Light3_1	In vitro	2	2mg/L 2,4-D
+Dark4	Dark4_3	In vitro	3	4mg/L 2,4-D
+Dark4	Dark4_2	In vitro	3	4mg/L 2,4-D
+Dark4	Dark4_1	In vitro	3	4mg/L 2,4-D
+Dark3	Dark3_3	In vitro	4	2mg/L 2,4-D
+Dark3	Dark3_1	In vitro	4	2mg/L 2,4-D
+Basal.plate	Basal.plate_3	In vivo	3	
+Basal.plate	Basal.plate_1	In vivo	3	

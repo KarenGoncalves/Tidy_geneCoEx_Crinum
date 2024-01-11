@@ -1,0 +1,1 @@
+[2,"Error in file(filename, \"r\", encoding = encoding) : \r\n  cannot open the connection\r\nCalls: .rs.sourceWithProgress -> eval -> eval -> source -> file\r\nIn addition: Warning message:\r\nIn file(filename, \"r\", encoding = encoding) :\r\n  cannot open file 'scripts/FUNCTIONS.R': No such file or directory\r\nExecution halted\r\n"]

@@ -1,0 +1,328 @@
+rm(list = ls())
+gc()
+
+source("scripts/FUNCTIONS.R") # loads packages too
+# future::plan() - sets parallel session (using multisession())
+plan(multisession, workers = detectCores())
+
+curRes <- 3.75
+minGenes <- 3
+r_cutoff <- 0.956
+res_module <- 1
+modulesToAnalyze <- c(3, 8, 4, 7, 42, 9, 2)
+theme_set(theme_classic())
+## Input files ##
+load("RDATA/GeneSelection_objects.RData")
+metadata <- read_delim("Data/samples_file.txt", 
+		       col_names = T, delim = "\t") 
+#####  Reorder Sample_type and Sample_order columns, to set the modules in order in the plot ####
+metadata$Sample_type <- factor(metadata$Sample_type, 
+			      levels = c("In vivo", "In vitro"))
+metadata_sampleOrder <- metadata %>%
+	dplyr::select(Sample_name, Sample_type, Sample_order) %>%
+	arrange(Sample_type, Sample_order) %>%
+	unique
+metadata$Sample_name <- 
+	factor(metadata$Sample_name, 
+	       levels = metadata_sampleOrder$Sample_name)
+
+Baits <- read_delim("Data/Genes_of_interest.txt")
+#funct_anno <- read_delim("output_tables/Annotation_formatted.tsv")
+
+dirs_to_create <- paste0(c("output_tables/", "RDATA/", "plots/"),
+			 paste0("Cor", r_cutoff, 
+			        "_res", curRes, "_Subanalysis1")
+)
+names(dirs_to_create) <- c("output_tables", "RDATA", "plots")
+sapply(dirs_to_create, dir.create)
+
+for (curModule in modulesToAnalyze) {
+	RDATA_plot <- paste0("RDATA/MainAnalysis_Cor", r_cutoff,
+	       "/ModuleData_forPlot_res", curRes, ".RData") 
+	load(RDATA_plot)
+	moduleNodeTable <- read_delim(paste0(
+		"output_tables/Main_analysis_annotations_Cor", r_cutoff,
+		"/Resolution", curRes, "/Module_", curModule, ".tsv")
+	)
+	genesModuleInterest <- 
+		(Expr_averaged_z_high_var_modules %>%
+		 	filter(module == curModule))$gene_ID %>%
+		unique
+	
+	Expression_files <- paste0("output_tables/",
+				   list.files(pattern = "Exp_table_long_averaged_z_",
+				   	   path = "output_tables/")
+	)
+
+	Exp_table_long_averaged_z <- sapply(Expression_files, simplify = F, \(x) {
+		read_delim(x, col_names = T, delim = "\t")
+	}) %>% list_rbind %>%
+		dplyr::select(!group) %>%
+		filter(gene_ID %in% genesModuleInterest)
+	
+	z_score_wide <- Exp_table_long_averaged_z %>%
+		dplyr::select(gene_ID, Sample_name, z.score) %>% 
+		pivot_wider(names_from = Sample_name, 
+			    values_from = z.score) %>% 
+		as.data.frame()
+	
+	row.names(z_score_wide) <- z_score_wide$gene_ID
+	nreps <- ncol(z_score_wide) - 1
+	# Gene correlation matrix
+	cor_matrix <- cor(t(z_score_wide[, -1]))
+	
+	##### Heatmap all genes of module #####
+	heatmapGenes <- 
+		heatmap_all_genes(cor_matrix, 
+				  left_join(Exp_table_long_averaged_z, 
+				  	  metadata_sampleOrder),
+				  caption = NULL, 
+				  title = paste("All genes in module", curModule)) +
+		facet_grid(cols = vars(Sample_type),
+			   scales = "free") +
+		heatmap_theme + 
+		theme(axis.text.y = element_blank(),
+		      axis.ticks.y = element_blank())
+	ggsave(heatmapGenes, 
+	       filename = paste0(dirs_to_create["plots"], 
+		      "/Module", curModule, "_heatmap_allGenes.png"),
+	       height = 6.14, width = 6.86)
+	
+	# Transform the lower triangle of the matrix into NA, since it is a duplication of the upper part
+	cor_matrix_upper_tri <- cor_matrix
+	cor_matrix_upper_tri[lower.tri(cor_matrix_upper_tri)] <- NA
+	
+	
+	# Edge selection: select only statistically significant correlations
+	#' t-distribution approximation
+	#' For each correlation coefficient r, you approximate a t statistics.
+	#' The equation is t = r * ( (n-2) / (1 - r^2) )^0.5
+	edge_table <- cor_matrix_upper_tri %>% 
+		as.data.frame() %>% 
+		mutate(from = row.names(cor_matrix)) %>% 
+		pivot_longer(cols = !from, names_to = "to", values_to = "r") %>% 
+		filter(!is.na(r)) %>% # remove the lower triangle
+		filter(from != to) %>% # remove self-to-self correlations
+		mutate(t = get_T_value(r, nreps)) %>% 
+		mutate(p.value = get_p_value(t, nreps)) %>% 
+		mutate(FDR = p.adjust(p.value, method = "fdr"),
+		       significant = FDR < 0.01)
+	
+	#### DECIDE r_cutoff ####
+	sub_r_cutoff = min((edge_table %>% 
+			    	mutate(r_bins = round(r, digits = 3)) %>%
+			    	group_by(r_bins) %>% 
+			    	summarize(allSig = all(significant)) %>% 
+			    	filter(allSig == T, 
+			    	       r_bins > 0))$r_bins)
+	
+	ggplot(edge_table) +
+		geom_histogram(aes(x = r,
+				   fill = significant),
+				   color = "white",
+				   bins = 100) +
+		geom_vline(xintercept = sub_r_cutoff, 
+			   color = "black",
+			   linewidth = 0.8) +
+		# check at which r value, the number of correlations starts to drop fast
+		labs(caption = paste0("r of gene correlations of module ", 
+			       curModule, "\nResolution ", curRes)) +
+		labs(fill = "FDR < 0.01") +
+		scale_x_continuous(breaks = seq(-.5, 1, .2)) +
+		theme(text = element_text(size = 14),
+		      axis.text = element_text(color = "black")
+		)
+	
+	r_histo_name = paste0(dirs_to_create["plots"],
+			      "/Module", curModule)
+	# ggsave(paste0(r_histo_name, ".svg"), height = 3.5, width = 5, bg = "white")
+	ggsave(paste0(r_histo_name, ".png"), height = 3.5, width = 5, bg = "white")
+	
+	
+	# co-expressed in the same direction
+	split_at <- 90000
+	dirPath = paste0(dirs_to_create["output_tables"],
+			 "/Module", curModule, "_edge_table"
+	)
+	if (dir.exists(dirPath)) {
+		for (i in list.files(path = dirPath)) {
+			paste0(dirPath, "/", i) %>%
+				file.remove()
+		}
+	} else {
+		dir.create(dirPath)
+	}
+	
+	edge_table <- 
+		edge_table %>% 
+		filter(r > sub_r_cutoff)
+	edge_table %>% 
+		mutate(group = (row_number() - 1) %/% !! split_at) %>%
+		group_split(group) %>%
+		map(.f = ~{
+			fileName = paste0(dirPath, "/edge_table_r",
+					  sub_r_cutoff, "_",
+					  unique(.x$group), ".tsv")
+			write_delim(.x, fileName,
+				    quote = "none", append = F,
+				    col_names = T, delim = "\t")
+		}) 
+	
+	node_table <- with(
+		edge_table,
+		data.frame(gene_ID = c(from, to) %>% unique()
+		)) %>% 
+		left_join(moduleNodeTable, by = "gene_ID") %>%
+		unique()
+
+	cat("Current module:", curModule, "-", nrow(node_table), "genes\n")
+	
+	# Create graph
+	my_network <- graph_from_data_frame(
+		edge_table %>% filter(r > sub_r_cutoff),
+		vertices = node_table,
+		directed = F
+	)
+
+	optimization_results <- get_optimization_table(
+		my_network, min_res = 0.25, 
+		max_res = 5, step = 0.25,
+		minGenes = minGenes
+		)
+	
+	## Plot optimization results ##
+	transform_factor = 
+		with(optimization_results,
+		     max(num_contained_gene)/max(num_module)
+		)
+		
+	optimization_results %>% 
+		ggplot(aes(x = resolution)) +
+		geom_line(aes(y = num_module),
+			  linewidth = 1.1, alpha = 0.8, color = "dodgerblue2") +
+		geom_point(aes(y = num_module),
+			   size = 3, alpha = 0.7) +
+		geom_line(aes(y = num_contained_gene/transform_factor),
+			  linewidth = 1.1, alpha = 0.8, color = "violetred2") +
+		geom_point(aes(y = num_contained_gene/transform_factor),
+			   size = 3, alpha = 0.7) +
+		scale_y_continuous(
+			sec.axis = sec_axis(
+				~. * transform_factor,
+				name = paste("num. genes in\nmodules w/ >=", minGenes, "genes")
+			)) +
+		labs(x = "resolution parameter",
+		     y = paste("num. modules w/ >=", minGenes, "genes")) +
+		theme_optimization
+	
+	
+	ggsave(paste0(dirs_to_create["plots"], "/Module", curModule,
+		      "_Optimize_resolution.png"), 
+	       height = 5, width = 5, bg = "white")
+	
+	#### Construct networks
+	modules <- cluster_leiden_mod(
+		my_network, r = res_module
+	)
+	
+	my_network_modules <- data.frame(
+		gene_ID = names(membership(modules)),
+		module = as.vector(membership(modules)))
+	
+	# Continue only with modules with 3 or more genes
+	module_minGenes <- my_network_modules %>% 
+		group_by(module) %>% count() %>% 
+		arrange(-n) %>% filter(n >= minGenes)
+	
+	my_network_modules <- my_network_modules %>% 
+		filter(module %in% module_minGenes$module)
+	
+	Expr_averaged_z_high_var_modules <- 
+		Exp_table_long_averaged_z_high_var %>% 
+		inner_join(my_network_modules, by = "gene_ID")
+	
+	modules_mean_z <- Expr_averaged_z_high_var_modules %>% 
+		group_by(module, Sample_name) %>% 
+		summarise(mean.z = mean(z.score)) %>% 
+		ungroup()
+	
+	module_peak_exp <- modules_mean_z %>% 
+		group_by(module) %>% 
+		slice_max(order_by = mean.z, n = 1) %>%
+		mutate(orderedSamples = sapply(Sample_name, \(x) {
+		       	which(levels(metadata$Sample_name) == x)
+		       })) %>%
+		dplyr::select(module, Sample_name,
+			      orderedSamples)
+		
+	heatmap_data = 
+		full_join(modules_mean_z, module_peak_exp[,-c(2, 3)], 
+			  by = c('module')) %>%
+		# Join with metadata, removing the column Replicate
+		full_join(unique(metadata[, -2]), by = "Sample_name")
+	
+	# genes per module
+	genes_per_module = Expr_averaged_z_high_var_modules %>% 
+		group_by(module) %>% 
+		summarize(gene_ID = unique(gene_ID)) %>% 
+		count()
+	
+	heatmap_data = full_join(heatmap_data, genes_per_module,
+				 by = "module") %>%
+		arrange(desc(n)) %>%
+		mutate(ordered_modules = factor(module,
+						levels = unique(.$module))
+		)
+	
+	### Heatmap of module mean expression z-score
+	module_heatmap <- heatmap_data %>% 
+		ggplot(aes(x = paste0(Sample_name, "\n", 
+				      ifelse(is.na(Hormone), "", Hormone)),
+			   y = ordered_modules)) +
+		geom_tile(aes(fill = mean.z), color = "grey80") +
+		scale_fill_gradient2(mid = "white",
+				     high = "#67001F",
+				     low = "#053061",
+				     breaks = c(-1.5, 0, 1.5), 
+				     labels = c("< -1.5", "0", "> 1.5")) +
+		labs(x = NULL, y = "Module", fill = "z-score",
+		     title = paste0("Nested analysis on module ", curModule),
+		     caption = paste0("r threshold = ", sub_r_cutoff, 
+		     		 "\nresolution = ", res_module,
+		     		 "\nTotal genes:",
+		     		 sum(genes_per_module$n))
+		) +
+		facet_grid(cols = vars(Sample_type),
+			   scales = "free") +
+		heatmap_theme
+	
+	module_heatmap_nGenes = heatmap_data %>%
+		select(ordered_modules, n) %>%
+		unique %>%
+		ggplot(aes(y = ordered_modules, x = "",
+			   label = n)) +
+		geom_tile(fill = "white", color = "white") +
+		geom_text() + labs(x = "Genes\nin\nmodule") +
+		annotation_theme
+	
+	wrap_plots(module_heatmap, module_heatmap_nGenes, 
+		   ncol = 2, widths = c(1, 0.08))
+	
+	plotName = paste0(dirs_to_create["plots"],
+			  "/Module", curModule, 
+			  "_heatmap_r", sub_r_cutoff, 
+			  "_res", res_module, 
+			  ".tiff")
+	ggsave(plotName, height = 6.14, width = 8.86)
+	
+	annotation <- moduleNodeTable %>%
+		inner_join(my_network_modules,
+			   by = "gene_ID") %>%
+		rename(Module = "module.x", SubModule = "module.y") %>%
+		arrange(SubModule) %>%
+		write_delim(file = paste0(dirs_to_create["output_tables"],
+					  "/Module", curModule,
+					  "_annotations.tsv"),
+			    delim = "\t", col_names = T, na = "", 
+			    quote = "none")
+}

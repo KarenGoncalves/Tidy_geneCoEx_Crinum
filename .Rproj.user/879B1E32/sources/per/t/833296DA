@@ -1,0 +1,26 @@
+{
+    "id": "833296DA",
+    "path": "D:/Tidy_geneCoEx_Crinum/scripts/6-GeneSelection_edgeCalculation_reanalysis.R",
+    "project_path": "scripts/6-GeneSelection_edgeCalculation_reanalysis.R",
+    "type": "r_source",
+    "hash": "1878190102",
+    "contents": "",
+    "dirty": false,
+    "created": 1704905422306.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "314,6",
+        "scrollLine": "311"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1704914242,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1704914242773,
+    "read_only": false,
+    "read_only_alternatives": []
+}

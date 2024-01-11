@@ -1,0 +1,8 @@
+gene_ID	module	blastx_short	blastp_short	blastx_fullName	blastp_fullName	shortPFAM	TmHMM	EggNOG_ID	Emapper_domain	COG_category	COG_description	shortGO_blast	shortGO_PFAM	GO_emapper_n	KEGG_blast	KEGG_emapper_n	protein_seq	completeness	protein_length
+Crpow_TRINITY_DN123252_c0_g1	67																		
+Crpow_TRINITY_DN20873_c4_g1	67																		
+Crpow_TRINITY_DN30979_c0_g2	67																		
+Crpow_TRINITY_DN557622_c0_g1	67																		
+Crpow_TRINITY_DN66561_c0_g1	67																		
+Crpow_TRINITY_DN79139_c0_g1	67	.	.	.	.	.	.	.	DUF4228	S	Domain of unknown function (DUF4228)	.	.	.	.	.	MGACASCEAAAVGPVSTAKLILFDGDLREFDVPTRVSSILEKDSEFFICDADDMEIDGLVTAVRSDGELRLGQIYFALPRRSMLKRTISGENLAALAVKASRAVKVPFVFGEVVATTGMSRRRGGGRDFATDLGVILE*	complete	139
+Crpow_TRINITY_DN9450_c0_g1	67	.	.	.	.	.	.	.	.	.		.	.	.	.	.	MKSMNKVSLNVFHSLKILKFKALHMEGMKKNERTILKESQASRKIDHPSSLSSYQRGSSLGVACVCSGSCSDDEVTSVTPNETAEFSTCFNSNECYFGDHDIWNTWHLCITSETRQTKRSC*	complete	122
